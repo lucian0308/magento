@@ -20,14 +20,16 @@
  *
  * @category    Mage
  * @package     Mage_XmlConnect
- * @copyright   Copyright (c) 2010 Magento Inc. (http://www.magentocommerce.com)
+ * @copyright   Copyright (c) 2011 Magento Inc. (http://www.magentocommerce.com)
  * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
  */
 
 /**
  * XmlConnect shopping cart controller
  *
- * @author  Magento Core Team <core@magentocommerce.com>
+ * @category    Mage
+ * @package     Mage_XmlConnect
+ * @author      Magento Core Team <core@magentocommerce.com>
  */
 class Mage_XmlConnect_CartController extends Mage_XmlConnect_Controller_Action
 {
@@ -170,9 +172,12 @@ class Mage_XmlConnect_CartController extends Mage_XmlConnect_Controller_Action
                  */
                 $qty = isset($params['qty']) ? $params['qty'] : 0;
                 $requestedQty = ($qty > 1) ? $qty : 1;
-                $subProduct = $product->getTypeInstance(true)->getProductByAttributes($request->getSuperAttribute(), $product);
+                $subProduct = $product->getTypeInstance(true)
+                    ->getProductByAttributes($request->getSuperAttribute(), $product);
 
-                if ($requestedQty < ($requiredQty = $subProduct->getStockItem()->getMinSaleQty())) {
+                if (!empty($subProduct)
+                    && $requestedQty < ($requiredQty = $subProduct->getStockItem()->getMinSaleQty())
+                ) {
                     $requestedQty = $requiredQty;
                 }
 
@@ -188,6 +193,29 @@ class Mage_XmlConnect_CartController extends Mage_XmlConnect_Controller_Action
 
             $this->_getSession()->setCartWasUpdated(true);
 
+            if (isset($params['whishlist_id'])) {
+                $wishlist = $this->_getWishlist();
+                $id = (int) $params['whishlist_id'];
+                $item = Mage::getModel('wishlist/item')->load($id);
+
+                if ($item->getWishlistId() == $wishlist->getId()) {
+                    try {
+                        $item->delete();
+                        $wishlist->save();
+                    } catch (Mage_Core_Exception $e) {
+                        $this->_message($e->getMessage(), self::MESSAGE_STATUS_ERROR);
+                    } catch(Exception $e) {
+                        $this->_message(
+                            $this->__('An error occurred while removing item from wishlist.'),
+                            self::MESSAGE_STATUS_ERROR
+                        );
+                    }
+                } else {
+                    $wishlistMessage = $this->__('Specified item does not exist in wishlist.');
+                }
+                Mage::helper('wishlist')->calculate();
+            }
+
             /**
              * @todo remove wishlist observer processAddToCart
              */
@@ -196,17 +224,23 @@ class Mage_XmlConnect_CartController extends Mage_XmlConnect_Controller_Action
             );
 
             if (!$this->_getSession()->getNoCartRedirect(true)) {
-                $message = $this->__('%s has been added to your cart.', Mage::helper('core')->htmlEscape($product->getName()));
-                if ($cart->getQuote()->getHasError()) {
-                    $message .= $this->__(' But cart has some errors.');
+                if (isset($wishlistMessage)) {
+                    $this->_message($wishlistMessage, self::MESSAGE_STATUS_ERROR);
+                } else {
+                    $productName = Mage::helper('core')->htmlEscape($product->getName());
+                    $message = $this->__('%s has been added to your cart.', $productName);
+                    if ($cart->getQuote()->getHasError()) {
+                        $message .= $this->__(' But cart has some errors.');
+                    }
+                    $this->_message($message, parent::MESSAGE_STATUS_SUCCESS);
                 }
-                $this->_message($message, parent::MESSAGE_STATUS_SUCCESS);
             }
         } catch (Mage_Core_Exception $e) {
             if ($this->_getSession()->getUseNotice(true)) {
                 $this->_message($e->getMessage(), parent::MESSAGE_STATUS_ERROR);
             } else {
-                $this->_message(implode("\n", array_unique(explode("\n", $e->getMessage()))), parent::MESSAGE_STATUS_ERROR);
+                $messageText = implode("\n", array_unique(explode("\n", $e->getMessage())));
+                $this->_message($messageText, parent::MESSAGE_STATUS_ERROR);
             }
         } catch (Exception $e) {
             $this->_message($this->__('Can\'t add item to shopping cart.'), self::MESSAGE_STATUS_ERROR);
@@ -322,5 +356,26 @@ class Mage_XmlConnect_CartController extends Mage_XmlConnect_Controller_Action
     protected function _getQuote()
     {
         return $this->_getCart()->getQuote();
+    }
+
+    /**
+     * Retrieve wishlist object
+     *
+     * @return Mage_Wishlist_Model_Wishlist|false
+     */
+    protected function _getWishlist()
+    {
+        try {
+            $wishlist = Mage::getModel('wishlist/wishlist')
+                ->loadByCustomer(Mage::getSingleton('customer/session')->getCustomer(), true);
+            Mage::register('wishlist', $wishlist);
+        } catch (Mage_Core_Exception $e) {
+            $this->_message($e->getMessage(), self::MESSAGE_STATUS_ERROR);
+            return false;
+        } catch (Exception $e) {
+            $this->_message($this->__('Can\'t create wishlist.'), self::MESSAGE_STATUS_ERROR);
+            return false;
+        }
+        return $wishlist;
     }
 }

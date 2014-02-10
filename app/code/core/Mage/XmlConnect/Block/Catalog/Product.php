@@ -20,38 +20,38 @@
  *
  * @category    Mage
  * @package     Mage_XmlConnect
- * @copyright   Copyright (c) 2010 Magento Inc. (http://www.magentocommerce.com)
+ * @copyright   Copyright (c) 2011 Magento Inc. (http://www.magentocommerce.com)
  * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
  */
 
 /**
  * Product data xml renderer
  *
- * @category   Mage
- * @package    Mage_XmlConnect
+ * @category    Mage
+ * @package     Mage_XmlConnect
  * @author      Magento Core Team <core@magentocommerce.com>
  */
-
 class Mage_XmlConnect_Block_Catalog_Product extends Mage_XmlConnect_Block_Catalog
 {
-
     /**
      * Retrieve product attributes as xml object
      *
      * @param Mage_Catalog_Model_Product $product
      * @param string $itemNodeName
-     *
      * @return Mage_XmlConnect_Model_Simplexml_Element
      */
     public function productToXmlObject(Mage_Catalog_Model_Product $product, $itemNodeName = 'item')
     {
-        $item = new Mage_XmlConnect_Model_Simplexml_Element('<' . $itemNodeName . '></' . $itemNodeName . '>');
+        /** @var $item Mage_XmlConnect_Model_Simplexml_Element */
+        $item = Mage::getModel('xmlconnect/simplexml_element', '<' . $itemNodeName . '></' . $itemNodeName . '>');
         if ($product && $product->getId()) {
             $item->addChild('entity_id', $product->getId());
             $item->addChild('name', $item->xmlentities(strip_tags($product->getName())));
             $item->addChild('entity_type', $product->getTypeId());
             $item->addChild('short_description', $item->xmlentities(strip_tags($product->getShortDescription())));
-            $item->addChild('description', Mage::helper('xmlconnect')->htmlize($item->xmlentities($product->getDescription())));
+            $description = Mage::helper('xmlconnect')->htmlize($item->xmlentities($product->getDescription()));
+            $item->addChild('description', $description);
+            $item->addChild('link', $product->getProductUrl());
 
             if ($itemNodeName == 'item') {
                 $imageToResize = Mage::helper('xmlconnect/image')->getImageSizeForContent('product_small');
@@ -69,7 +69,7 @@ class Mage_XmlConnect_Block_Catalog_Product extends Mage_XmlConnect_Block_Catalo
             $file = Mage::helper('xmlconnect')->urlToPath($icon);
             $iconXml->addAttribute('modification_time', filemtime($file));
 
-            $item->addChild('in_stock', (int)$product->isSalable());
+            $item->addChild('in_stock', (int)$product->isInStock());
             $item->addChild('is_salable', (int)$product->isSalable());
             /**
              * By default all products has gallery (because of collection not load gallery attribute)
@@ -122,23 +122,28 @@ class Mage_XmlConnect_Block_Catalog_Product extends Mage_XmlConnect_Block_Catalo
     protected function _getMinimalQty($product)
     {
         if ($stockItem = $product->getStockItem()) {
-            return ($stockItem->getMinSaleQty() && $stockItem->getMinSaleQty() > 0 ? $stockItem->getMinSaleQty() * 1 : null);
+            if ($stockItem->getMinSaleQty() && $stockItem->getMinSaleQty() > 0) {
+                return ($stockItem->getMinSaleQty() * 1);
+            }
         }
         return null;
     }
+
     /**
      * Render product info xml
      *
+     * @throws Mage_Core_Exception
      * @return string
      */
     protected function _toHtml()
     {
+        /** @var $product Mage_Catalog_Model_Product */
         $product = Mage::getModel('catalog/product')
             ->setStoreId(Mage::app()->getStore()->getId())
             ->load($this->getRequest()->getParam('id', 0));
 
         if (!$product) {
-            throw new Mage_Core_Exception($this->__('Selected product is unavailable.'));
+            Mage::throwException($this->__('Selected product is unavailable.'));
         } else {
             $this->setProduct($product);
             $productXmlObj = $this->productToXmlObject($product, 'product');

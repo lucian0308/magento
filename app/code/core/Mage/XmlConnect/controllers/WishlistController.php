@@ -20,14 +20,16 @@
  *
  * @category    Mage
  * @package     Mage_XmlConnect
- * @copyright   Copyright (c) 2010 Magento Inc. (http://www.magentocommerce.com)
+ * @copyright   Copyright (c) 2011 Magento Inc. (http://www.magentocommerce.com)
  * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
  */
 
 /**
  * XmlConnect wishlist controller
  *
- * @author  Magento Core Team <core@magentocommerce.com>
+ * @category    Mage
+ * @package     Mage_XmlConnect
+ * @author      Magento Core Team <core@magentocommerce.com>
  */
 class Mage_XmlConnect_WishlistController extends Mage_XmlConnect_Controller_Action
 {
@@ -116,7 +118,7 @@ class Mage_XmlConnect_WishlistController extends Mage_XmlConnect_Controller_Acti
         }
 
         try {
-            $item = $wishlist->addNewItem($product->getId());
+            $item = $wishlist->addNewItem($product);
             if (strlen(trim((string)$request->getParam('description')))) {
                 $item->setDescription($request->getParam('description'))
                    ->save();
@@ -206,14 +208,14 @@ class Mage_XmlConnect_WishlistController extends Mage_XmlConnect_Controller_Acti
             $problemsFlag = false;
 
             foreach ($post['description'] as $itemId => $description) {
+                /** @var $item Mage_Wishlist_Model_Item */
                 $item = Mage::getModel('wishlist/item')->load($itemId);
                 $description = (string) $description;
                 if ($item->getWishlistId() != $wishlist->getId()) {
                     continue;
                 }
                 try {
-                    $item->setDescription($description)
-                        ->save();
+                    $item->setDescription($description)->save();
                     $updatedItems++;
                 } catch (Exception $e) {
                     $problemsFlag = true;
@@ -285,7 +287,7 @@ class Mage_XmlConnect_WishlistController extends Mage_XmlConnect_Controller_Acti
                      $e->getCode() == Mage_Wishlist_Model_Item::EXCEPTION_CODE_IS_GROUPED_PRODUCT) {
                 $item->delete();
 
-                $message = new Mage_XmlConnect_Model_Simplexml_Element('<message></message>');
+                $message = Mage::getModel('xmlconnect/simplexml_element', '<message></message>');
                 $message->addChild('status', self::MESSAGE_STATUS_SUCCESS);
                 $message->addChild('has_required_options', 1);
                 $message->addChild('product_id', $item->getProductId());

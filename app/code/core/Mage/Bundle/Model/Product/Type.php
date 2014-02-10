@@ -20,7 +20,7 @@
  *
  * @category    Mage
  * @package     Mage_Bundle
- * @copyright   Copyright (c) 2010 Magento Inc. (http://www.magentocommerce.com)
+ * @copyright   Copyright (c) 2011 Magento Inc. (http://www.magentocommerce.com)
  * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
  */
 
@@ -179,7 +179,13 @@ class Mage_Bundle_Model_Product_Type extends Mage_Catalog_Model_Product_Type_Abs
                 $selectionIds = unserialize($customOption->getValue());
                 $selections = $this->getSelectionsByIds($selectionIds, $product);
                 foreach ($selections->getItems() as $selection) {
-                    $weight += $selection->getWeight();
+                    $qtyOption = $this->getProduct($product)
+                        ->getCustomOption('selection_qty_' . $selection->getSelectionId());
+                    if ($qtyOption) {
+                        $weight += $selection->getWeight() * $qtyOption->getValue();
+                    } else {
+                        $weight += $selection->getWeight();
+                    }
                 }
             }
             return $weight;
@@ -226,6 +232,14 @@ class Mage_Bundle_Model_Product_Type extends Mage_Catalog_Model_Product_Type_Abs
             $product->setData('weight', false);
         }
 
+        if ($product->getPriceType() == Mage_Bundle_Model_Product_Price::PRICE_TYPE_DYNAMIC) {
+            $product->setData(
+                'msrp_enabled', Mage_Catalog_Model_Product_Attribute_Source_Msrp_Type_Enabled::MSRP_ENABLE_NO
+            );
+            $product->unsetData('msrp');
+            $product->unsetData('msrp_display_actual_price_type');
+        }
+
         $product->canAffectOptions(false);
 
         if ($product->getCanSaveBundleSelections()) {
@@ -259,12 +273,13 @@ class Mage_Bundle_Model_Product_Type extends Mage_Catalog_Model_Product_Type_Abs
     public function save($product = null)
     {
         parent::save($product);
+        $product = $this->getProduct($product);
         /* @var $resource Mage_Bundle_Model_Mysql4_Bundle */
         $resource = Mage::getResourceModel('bundle/bundle');
 
-        $options = $this->getProduct($product)->getBundleOptionsData();
+        $options = $product->getBundleOptionsData();
         if ($options) {
-            $this->getProduct($product)->setIsRelationsChanged(true);
+            $product->setIsRelationsChanged(true);
 
             foreach ($options as $key => $option) {
                 if (isset($option['option_id']) && $option['option_id'] == '') {
@@ -273,8 +288,8 @@ class Mage_Bundle_Model_Product_Type extends Mage_Catalog_Model_Product_Type_Abs
 
                 $optionModel = Mage::getModel('bundle/option')
                     ->setData($option)
-                    ->setParentId($this->getProduct($product)->getId())
-                    ->setStoreId($this->getProduct($product)->getStoreId());
+                    ->setParentId($product->getId())
+                    ->setStoreId($product->getStoreId());
 
                 $optionModel->isDeleted((bool)$option['delete']);
                 $optionModel->save();
@@ -285,7 +300,7 @@ class Mage_Bundle_Model_Product_Type extends Mage_Catalog_Model_Product_Type_Abs
             $usedProductIds      = array();
             $excludeSelectionIds = array();
 
-            $selections = $this->getProduct($product)->getBundleSelectionsData();
+            $selections = $product->getBundleSelectionsData();
             if ($selections) {
                 foreach ($selections as $index => $group) {
                     foreach ($group as $key => $selection) {
@@ -300,7 +315,7 @@ class Mage_Bundle_Model_Product_Type extends Mage_Catalog_Model_Product_Type_Abs
                         $selectionModel = Mage::getModel('bundle/selection')
                             ->setData($selection)
                             ->setOptionId($options[$index]['option_id'])
-                            ->setParentProductId($this->getProduct($product)->getId());
+                            ->setParentProductId($product->getId());
 
                         $selectionModel->isDeleted((bool)$selection['delete']);
                         $selectionModel->save();
@@ -314,12 +329,12 @@ class Mage_Bundle_Model_Product_Type extends Mage_Catalog_Model_Product_Type_Abs
                     }
                 }
 
-                $resource->dropAllUnneededSelections($this->getProduct($product)->getId(), $excludeSelectionIds);
-                $resource->saveProductRelations($this->getProduct($product)->getId(), array_unique($usedProductIds));
+                $resource->dropAllUnneededSelections($product->getId(), $excludeSelectionIds);
+                $resource->saveProductRelations($product->getId(), array_unique($usedProductIds));
             }
 
-            if ($this->getProduct($product)->getData('price_type') != $this->getProduct($product)->getOrigData('price_type')) {
-                $resource->dropAllQuoteChildItems($this->getProduct($product)->getId());
+            if ($product->getData('price_type') != $product->getOrigData('price_type')) {
+                $resource->dropAllQuoteChildItems($product->getId());
             }
         }
 
@@ -387,6 +402,7 @@ class Mage_Bundle_Model_Product_Type extends Mage_Catalog_Model_Product_Type_Abs
             $storeId = $this->getProduct($product)->getStoreId();
             $selectionsCollection = Mage::getResourceModel('bundle/selection_collection')
                 ->addAttributeToSelect(Mage::getSingleton('catalog/config')->getProductAttributes())
+                ->addAttributeToSelect('tax_class_id') //used for calculation item taxes in Bundle with Dynamic Price
                 ->setFlag('require_stock_items', true)
                 ->setFlag('product_children', true)
                 ->setPositionOrder()
@@ -787,7 +803,11 @@ class Mage_Bundle_Model_Product_Type extends Mage_Catalog_Model_Product_Type_Abs
                 if ($selection->isSalable()) {
                     $selectionQty = $product->getCustomOption('selection_qty_' . $selection->getSelectionId());
                     if ($selectionQty) {
-                        $price = $product->getPriceModel()->getSelectionPrice($product, $selection, $selectionQty->getValue());
+                        $price = $product->getPriceModel()->getSelectionPrice(
+                            $product,
+                            $selection,
+                            $selectionQty->getValue()
+                        );
 
                         $option = $options->getItemById($selection->getOptionId());
                         if (!isset($bundleOptions[$option->getId()])) {
@@ -987,5 +1007,67 @@ class Mage_Bundle_Model_Product_Type extends Mage_Catalog_Model_Product_Type_Abs
         );
 
         return $options;
+    }
+
+    /**
+     * Check if product can be configured
+     *
+     * @param Mage_Catalog_Model_Product $product
+     * @return bool
+     */
+    public function canConfigure($product = null)
+    {
+        return $product instanceof Mage_Catalog_Model_Product
+            && $product->isAvailable()
+            && parent::canConfigure();
+    }
+
+    /**
+     * Check if Minimum Advertise Price is enabled at least in one option
+     *
+     * @param Mage_Catalog_Model_Product $product
+     * @param int $visibility
+     * @return bool|null
+     */
+    public function isMapEnabledInOptions($product, $visibility = null)
+    {
+        /**
+         * @TODO: In order to clarify is MAP enabled for product we can check associated products.
+         * Commented for future improvements.
+         */
+        /*
+        $collection = $this->getUsedProductCollection($product);
+        $helper = Mage::helper('catalog');
+
+        $result = null;
+        $parentVisibility = $product->getMsrpDisplayActualPriceType();
+        if ($parentVisibility === null) {
+            $parentVisibility = $helper->getMsrpDisplayActualPriceType();
+        }
+        $visibilities = array($parentVisibility);
+        foreach ($collection as $item) {
+            if ($helper->canApplyMsrp($item)) {
+                $productVisibility = $item->getMsrpDisplayActualPriceType();
+                if ($productVisibility === null) {
+                    $productVisibility = $helper->getMsrpDisplayActualPriceType();
+                }
+                $visibilities[] = $productVisibility;
+                $result = true;
+            }
+        }
+
+        if ($result && $visibility !== null) {
+            if ($visibilities) {
+                $maxVisibility = max($visibilities);
+                $result = $result && $maxVisibility == $visibility;
+            } else {
+                $result = false;
+            }
+        }
+
+        return $result;
+        */
+
+        return null;
     }
 }

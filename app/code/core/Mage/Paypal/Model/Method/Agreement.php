@@ -20,7 +20,7 @@
  *
  * @category    Mage
  * @package     Mage_Paypal
- * @copyright   Copyright (c) 2010 Magento Inc. (http://www.magentocommerce.com)
+ * @copyright   Copyright (c) 2011 Magento Inc. (http://www.magentocommerce.com)
  * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
  */
 
@@ -295,7 +295,9 @@ class Mage_Paypal_Model_Method_Agreement extends Mage_Sales_Model_Payment_Method
     {
         $order = $payment->getOrder();
         $billingAgreement = Mage::getModel('sales/billing_agreement')->load(
-            $payment->getAdditionalInformation(Mage_Sales_Model_Payment_Method_Billing_AgreementAbstract::TRANSPORT_BILLING_AGREEMENT_ID)
+            $payment->getAdditionalInformation(
+                Mage_Sales_Model_Payment_Method_Billing_AgreementAbstract::TRANSPORT_BILLING_AGREEMENT_ID
+            )
         );
 
         $api = $this->_pro->getApi()
@@ -319,7 +321,7 @@ class Mage_Paypal_Model_Method_Agreement extends Mage_Sales_Model_Payment_Method
         if ($api->getBillingAgreementId()) {
             $order->addRelatedObject($billingAgreement);
             $billingAgreement->setIsObjectChanged(true);
-            $billingAgreement->addOrderRelation($order->getId());
+            $billingAgreement->addOrderRelation($order);
         }
 
         return $this;

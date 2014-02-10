@@ -20,7 +20,7 @@
  *
  * @category    Mage
  * @package     Mage_Connect
- * @copyright   Copyright (c) 2010 Magento Inc. (http://www.magentocommerce.com)
+ * @copyright   Copyright (c) 2011 Magento Inc. (http://www.magentocommerce.com)
  * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
  */
 
@@ -397,7 +397,7 @@ class Mage_Connect_Packager
      */
     public function getLocalModifiedFiles($chanName, $package, $cacheObj, $configObj)
     {
-        $p = $cachObj->getPackageObject($chanName, $package);
+        $p = $cacheObj->getPackageObject($chanName, $package);
         $hashContents = $p->getHashContents();
         $listModified = array();
         foreach ($hashContents as $file=>$hash) {
@@ -479,7 +479,7 @@ class Mage_Connect_Packager
             /**
              * Iterate packages of channel $chan
              */
-            $state = $configObj->preferred_state ? $configObj->preferred_state : "devel";
+            $state = $configObj->preferred_state ? $configObj->preferred_state : "stable";
 
             foreach($localPackages as $localName=>$localData) {
                 if(!isset($remotePackages[$localName])) {
@@ -577,7 +577,13 @@ class Mage_Connect_Packager
             }
 
         } catch (Exception $e) {
-            //$this->_failed[] = array('name'=>$package, 'channel'=>$chanName, 'max'=>$versionMax, 'min'=>$versionMin, 'reason'=>$e->getMessage());
+//            $this->_failed[] = array(
+//                'name'=>$package,
+//                'channel'=>$chanName,
+//                'max'=>$versionMax,
+//                'min'=>$versionMin,
+//                'reason'=>$e->getMessage()
+//            );
         }
 
         $level--;
@@ -602,11 +608,11 @@ class Mage_Connect_Packager
      * @param array $dependencies Package dependencies
      */
     private function addHashData(&$hash, $name, $channel, $downloaded_version = '', $stability = '', $versionMin = '',
-            $versionMax = '', $install_state = '', $message = '', $dependencies = '') 
+            $versionMax = '', $install_state = '', $message = '', $dependencies = '')
     {
             /**
-             * @todo When we are building dependencies tree we should base this calculations not on full key as on a 
-             * unique value but check it by parts. First part which should be checked is EXTENSION_NAME also this 
+             * @todo When we are building dependencies tree we should base this calculations not on full key as on a
+             * unique value but check it by parts. First part which should be checked is EXTENSION_NAME also this
              * part should be unique globally not per channel.
              */
             //$key = $chanName . "/" . $package;
@@ -619,7 +625,8 @@ class Mage_Connect_Packager
                 'min' => $versionMin,
                 'max' => $versionMax,
                 'install_state' => $install_state,
-                'message' => (isset($this->install_states[$install_state]) ? $this->install_states[$install_state] : '').$message,
+                'message' => (isset($this->install_states[$install_state]) ?
+                        $this->install_states[$install_state] : '').$message,
                 'packages' => $dependencies,
             );
 
@@ -668,9 +675,31 @@ class Mage_Connect_Packager
             if (!$releases || !count($releases)) {
                 throw new Exception("No releases for '{$package}', skipping");
             }
-            $state = $config->preferred_state ? $config->preferred_state : 'devel';
-            $version = $cache->detectVersionFromRestArray($releases, $versionMin, $versionMax, $state);
-            if(!$version) {
+            $state = $config->preferred_state ? $config->preferred_state : 'stable';
+            /**
+             * Check current package version first
+             */
+            $installedPackage = $cache->getPackage($chanName, $package);
+            if ($installedPackage && is_array($installedPackage)) {
+                $installedRelease = array(array(
+                    'v' => $installedPackage['version'],
+                    's' => $installedPackage['stability'],
+                ));
+                $version = $cache->detectVersionFromRestArray($installedRelease, $versionMin, $versionMax, $state);
+            }
+            if (!$version) {
+                $version = $cache->detectVersionFromRestArray($releases, $versionMin, $versionMax, $state);
+            }
+            if (!$version) {
+                $versionState = $cache->detectVersionFromRestArray($releases, $versionMin, $versionMax);
+                if ($versionState) {
+                    $packageInfo = $rest->getPackageReleaseInfo($package, $versionState);
+                    if (false !== $packageInfo) {
+                        $stability = $packageInfo->getStability();
+                        throw new Exception("Extension is '{$stability}' please check(or change) stability settings".
+                                            " on Magento Connect Manager");
+                    }
+                }
                 throw new Exception("Version for '{$package}' was not detected");
             }
             $packageInfo = $rest->getPackageReleaseInfo($package, $version);
@@ -720,7 +749,7 @@ class Mage_Connect_Packager
                     $dependencies[$row['name']] = $row;
                 }
             }
-            
+
             /**
              * @todo When we are building dependencies tree we should base this calculations not on full key as on a
              * unique value but check it by parts. First part which should be checked is EXTENSION_NAME also this part
@@ -742,7 +771,7 @@ class Mage_Connect_Packager
                     }
                     $method = __FUNCTION__;
                     /**
-                     * @todo When we are building dependencies tree we should base this calculations not on full key as 
+                     * @todo When we are building dependencies tree we should base this calculations not on full key as
                      * on a unique value but check it by parts. First part which should be checked is EXTENSION_NAME
                      * also this part should be unique globally not per channel.
                      */
@@ -801,7 +830,13 @@ class Mage_Connect_Packager
             }
             unset($rest);
         } catch (Exception $e) {
-            $_failed[] = array('name'=>$package, 'channel'=>$chanName, 'max'=>$versionMax, 'min'=>$versionMin, 'reason'=>$e->getMessage());
+            $_failed[] = array(
+                'name'=>$package,
+                'channel'=>$chanName,
+                'max'=>$versionMax,
+                'min'=>$versionMin,
+                'reason'=>$e->getMessage()
+            );
         }
 
 

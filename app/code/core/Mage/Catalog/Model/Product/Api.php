@@ -20,7 +20,7 @@
  *
  * @category    Mage
  * @package     Mage_Catalog
- * @copyright   Copyright (c) 2010 Magento Inc. (http://www.magentocommerce.com)
+ * @copyright   Copyright (c) 2011 Magento Inc. (http://www.magentocommerce.com)
  * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
  */
 
@@ -130,18 +130,20 @@ class Mage_Catalog_Model_Product_Api extends Mage_Catalog_Model_Api_Resource
      *
      * @param string $type
      * @param int $set
+     * @param string $sku
      * @param array $productData
+     * @param string $store
      * @return int
      */
-    public function create($type, $set, $sku, $productData)
+    public function create($type, $set, $sku, $productData, $store = null)
     {
         if (!$type || !$set || !$sku) {
             $this->_fault('data_invalid');
         }
 
+        /** @var $product Mage_Catalog_Model_Product */
         $product = Mage::getModel('catalog/product');
-        /* @var $product Mage_Catalog_Model_Product */
-        $product->setStoreId($this->_getStoreId())
+        $product->setStoreId($this->_getStoreId($store))
             ->setAttributeSetId($set)
             ->setTypeId($type)
             ->setSku($sku);

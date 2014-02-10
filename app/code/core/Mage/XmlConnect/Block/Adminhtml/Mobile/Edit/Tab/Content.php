@@ -20,7 +20,7 @@
  *
  * @category    Mage
  * @package     Mage_XmlConnect
- * @copyright   Copyright (c) 2010 Magento Inc. (http://www.magentocommerce.com)
+ * @copyright   Copyright (c) 2011 Magento Inc. (http://www.magentocommerce.com)
  * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
  */
 class Mage_XmlConnect_Block_Adminhtml_Mobile_Edit_Tab_Content
@@ -84,7 +84,7 @@ class Mage_XmlConnect_Block_Adminhtml_Mobile_Edit_Tab_Content
             'before_element_html' => $this->__('Get Content from CMS Page').'</td><td class="label">',
         ));
 
-        if (isset($conf['native']['pages'])) {
+        if (!empty($conf['native']['pages'])) {
             foreach ($conf['native']['pages'] as $key=>$dummy) {
                 $this->_addPage($fieldset, 'conf[native][pages]['.$key.']');
             }
@@ -117,7 +117,7 @@ class Mage_XmlConnect_Block_Adminhtml_Mobile_Edit_Tab_Content
     }
 
     /**
-     * Returns status flag about this tab can be showen or not
+     * Returns status flag about this tab can be shown or not
      *
      * @return true
      */

@@ -20,14 +20,13 @@
  *
  * @category    Mage
  * @package     Mage_XmlConnect
- * @copyright   Copyright (c) 2010 Magento Inc. (http://www.magentocommerce.com)
+ * @copyright   Copyright (c) 2011 Magento Inc. (http://www.magentocommerce.com)
  * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
  */
 
 /**
  * Check / Money order Payment method xml renderer
  *
- * @category   Mage
  * @category   Mage
  * @package    Mage_XmlConnect
  * @author     Magento Core Team <core@magentocommerce.com>

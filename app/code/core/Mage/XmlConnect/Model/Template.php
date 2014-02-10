@@ -20,10 +20,17 @@
  *
  * @category    Mage
  * @package     Mage_XmlConnect
- * @copyright   Copyright (c) 2010 Magento Inc. (http://www.magentocommerce.com)
+ * @copyright   Copyright (c) 2011 Magento Inc. (http://www.magentocommerce.com)
  * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
  */
 
+/**
+ * XmlConnect Model Template
+ *
+ * @category    Mage
+ * @package     Mage_XmlConnect
+ * @author      Magento Core Team <core@magentocommerce.com>
+ */
 class Mage_XmlConnect_Model_Template extends Mage_Core_Model_Template
 {
     /**
@@ -34,6 +41,25 @@ class Mage_XmlConnect_Model_Template extends Mage_Core_Model_Template
     protected function _construct()
     {
         $this->_init('xmlconnect/template');
+    }
+
+    /**
+     * Processing object before save data
+     * Add created_at  and modified_at params
+     *
+     * @return Mage_XmlConnect_Model_Template
+     */
+    protected function _beforeSave()
+    {
+        parent::_beforeSave();
+
+        $currentDate = Mage::getSingleton('core/date')->gmtDate();
+        if (!$this->getId()) {
+            $this->setCreatedAt($currentDate);
+        }
+        $this->setModifiedAt($currentDate);
+
+        return $this;
     }
 
     /**
@@ -50,10 +76,9 @@ class Mage_XmlConnect_Model_Template extends Mage_Core_Model_Template
      * Retrieve processed template
      *
      * @param array $variables
-     * @param bool $usePreprocess
      * @return string
      */
-    public function getProcessedTemplate(array $variables = array(), $usePreprocess = false)
+    public function getProcessedTemplate(array $variables = array())
     {
         /* @var $processor Mage_Widget_Model_Template_Filter */
         $processor = Mage::getModel('widget/template_filter');
@@ -66,10 +91,17 @@ class Mage_XmlConnect_Model_Template extends Mage_Core_Model_Template
             $processor->setStoreId(1);
         }
 
-        $htmlDescription = '<div style="font-size: 0.8em; text-decoration: underline; margin-top: 1.5em; line-height: 2em;">%s:</div>';
-        $html  = sprintf($htmlDescription, Mage::helper('xmlconnect')->__('Push title')) . $this->getPushTitle();
-        $html .= sprintf($htmlDescription, Mage::helper('xmlconnect')->__('Message title')) . $this->getMessageTitle();
-        $html .= sprintf($htmlDescription, Mage::helper('xmlconnect')->__('Message content')) . $processor->filter($this->getContent());
+        $htmlDescription = <<<EOT
+<div style="font-size: 0.8em; text-decoration: underline; margin-top: 1.5em; line-height: 2em;">%s:</div>
+EOT;
+        /** @var $coreHelper Mage_Core_Helper_Data */
+        $coreHelper = Mage::helper('core');
+        $html  = sprintf($htmlDescription, Mage::helper('xmlconnect')->__('Push title'))
+                    . $this->getPushTitle();
+        $html .= sprintf($htmlDescription, Mage::helper('xmlconnect')->__('Message title'))
+                    . $this->getMessageTitle();
+        $html .= sprintf($htmlDescription, Mage::helper('xmlconnect')->__('Message content'))
+                    . $processor->filter($this->getContent());
 
         return $html;
     }

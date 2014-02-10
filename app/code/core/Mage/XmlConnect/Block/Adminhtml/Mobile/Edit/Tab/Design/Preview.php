@@ -20,7 +20,7 @@
  *
  * @category    Mage
  * @package     Mage_XmlConnect
- * @copyright   Copyright (c) 2010 Magento Inc. (http://www.magentocommerce.com)
+ * @copyright   Copyright (c) 2011 Magento Inc. (http://www.magentocommerce.com)
  * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
  */
 class Mage_XmlConnect_Block_Adminhtml_Mobile_Edit_Tab_Design_Preview extends Mage_Adminhtml_Block_Template
@@ -32,7 +32,7 @@ class Mage_XmlConnect_Block_Adminhtml_Mobile_Edit_Tab_Design_Preview extends Mag
     {
         parent::__construct();
 
-        $device = Mage::helper('xmlconnect')->getApplication()->getType();
+        $device = Mage::helper('xmlconnect')->getDeviceType();
         if (array_key_exists($device, Mage::helper('xmlconnect')->getSupportedDevices())) {
             $template = 'xmlconnect/edit/tab/design/preview_' . strtolower($device) . '.phtml';
         } else {
@@ -56,7 +56,7 @@ class Mage_XmlConnect_Block_Adminhtml_Mobile_Edit_Tab_Design_Preview extends Mag
             if ($model->getId() !== null) {
                 $params = array('application_id' => $model->getId());
             } else {
-                $params = array('devtype' => $model->getDevtype());
+                $params = array('devtype' => $model->getType());
             }
 
         }

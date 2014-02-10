@@ -20,26 +20,34 @@
  *
  * @category    Mage
  * @package     Mage_XmlConnect
- * @copyright   Copyright (c) 2010 Magento Inc. (http://www.magentocommerce.com)
+ * @copyright   Copyright (c) 2011 Magento Inc. (http://www.magentocommerce.com)
  * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
  */
 
+/**
+ * XmlConnect default helper
+ *
+ * @category    Mage
+ * @package     Mage_XmlConnect
+ * @author      Magento Core Team <core@magentocommerce.com>
+ */
 class Mage_XmlConnect_Helper_Data extends Mage_Core_Helper_Abstract
 {
     /**
      * Push title length
-     *
-     * @var int
      */
     const PUSH_TITLE_LENGTH = 140;
 
     /**
      * Message title length
-     *
-     * @var int
      */
     const MESSAGE_TITLE_LENGTH = 255;
 
+    /**
+     * List of the keys for xml config that have to be excluded form application config
+     *
+     * @var array
+     */
     protected $_excludedXmlConfigKeys = array(
         'notifications/applicationMasterSecret',
     );
@@ -60,38 +68,68 @@ class Mage_XmlConnect_Helper_Data extends Mage_Core_Helper_Abstract
 
     /**
      * XML path to nodes to be excluded
-     *
-     * @var string
      */
     const XML_NODE_CONFIG_EXCLUDE_FROM_XML = 'xmlconnect/mobile_application/nodes_excluded_from_config_xml';
 
     /**
      * Default device type
-     *
-     * @var string
      */
     const DEVICE_TYPE_DEFAULT = 'unknown';
 
     /**
      * iPhone device identifier
-     *
-     * @var string
      */
     const DEVICE_TYPE_IPHONE = 'iphone';
 
     /**
      * iPad device identifier
-     *
-     * @var string
      */
     const DEVICE_TYPE_IPAD = 'ipad';
 
     /**
      * Android device identifier
-     *
-     * @var string
      */
     const DEVICE_TYPE_ANDROID = 'android';
+
+    /**
+     * Social network Twitter id
+     */
+    const SOCIAL_NETWORK_TWITTER = 'twitter';
+
+    /**
+     * Social network Facebook id
+     */
+    const SOCIAL_NETWORK_FACEBOOK = 'facebook';
+
+    /**
+     * Social network LinkedIn id
+     */
+    const SOCIAL_NETWORK_LINKEDIN = 'linkedin';
+
+    /**
+     * Get device preview model
+     *
+     * @throws Mage_Core_Exception
+     * @return Mage_XmlConnect_Model_Preview_Abstract
+     */
+    public function getPreviewModel()
+    {
+        $deviceType = $this->getDeviceType();
+
+        switch ($deviceType) {
+            case self::DEVICE_TYPE_IPHONE:
+            case self::DEVICE_TYPE_IPAD:
+            case self::DEVICE_TYPE_ANDROID:
+                $previewModel = Mage::getSingleton('xmlconnect/preview_' . strtolower($deviceType));
+                break;
+            default:
+                Mage::throwException(
+                    Mage::helper('xmlconnect')->__('Device doesn\'t recognized: "%s". Unable to load preview model.', $deviceType)
+                );
+                break;
+        }
+        return $previewModel;
+    }
 
     /**
      * Get device helper
@@ -111,7 +149,9 @@ class Mage_XmlConnect_Helper_Data extends Mage_Core_Helper_Abstract
                 $helper =  Mage::helper('xmlconnect/' . $deviceType);
                 break;
             default:
-                Mage::throwException(Mage::helper('xmlconnect')->__('Device doesn\'t recognized: "%s". Unable to load a helper.', $deviceType));
+                Mage::throwException(
+                    Mage::helper('xmlconnect')->__('Device doesn\'t recognized: "%s". Unable to load a helper.', $deviceType)
+                );
                 break;
         }
         return $helper;
@@ -191,46 +231,56 @@ class Mage_XmlConnect_Helper_Data extends Mage_Core_Helper_Abstract
     }
 
     /**
-     * Retrieve country options array
+     * Retrieve device specific country options array
      *
+     * @throws Mage_Core_Exception
      * @param bool $isItunes
      * @return array
      */
     public function getCountryOptionsArray($isItunes = false)
     {
-        Varien_Profiler::start('TEST: '.__METHOD__);
-        switch ($this->getDeviceType()) {
+        Varien_Profiler::start('TEST: ' . __METHOD__);
+        $deviceType = $this->getDeviceType();
+        switch ($deviceType) {
             case self::DEVICE_TYPE_IPHONE:
             case self::DEVICE_TYPE_IPAD:
-                $cacheKey = 'XMLCONNECT_COUNTRY_ITUNES_SELECT_STORE_'.Mage::app()->getStore()->getCode();
-                $itunesCountries = $this->getDeviceHelper()->getItunesCountriesArray();
+                $cacheKey = 'XMLCONNECT_COUNTRY_ITUNES_SELECT_STORE_' . Mage::app()->getStore()->getCode();
+                $deviceCountries = $this->getDeviceHelper()->getItunesCountriesArray();
                 break;
             case self::DEVICE_TYPE_ANDROID:
+                $cacheKey = 'XMLCONNECT_COUNTRY_ANDROID_SELECT_STORE_' . Mage::app()->getStore()->getCode();
+                $deviceCountries = $this->getDeviceHelper()->getAndroidMarketCountriesArray();
+                break;
             default:
-                $cacheKey = 'XMLCONNECT_COUNTRY_SELECT_STORE_'.Mage::app()->getStore()->getCode();
+                Mage::throwException(
+                    Mage::helper('xmlconnect')->__('Country options don\'t recognized for "%s".', $deviceType)
+                );
                 break;
         }
 
-        if (false && Mage::app()->useCache('config') && $cache = Mage::app()->loadCache($cacheKey)) {
+        if (Mage::app()->useCache('config') && $cache = Mage::app()->loadCache($cacheKey)) {
             $options = unserialize($cache);
         } else {
-            if (isset($itunesCountries)) {
+            if (isset($deviceCountries)) {
                 $options = Mage::getModel('directory/country')
                     ->getResourceCollection()
-                    ->addFieldToFilter('country_id', array('in' => $itunesCountries))
+                    ->addFieldToFilter('country_id', array('in' => $deviceCountries))
                     ->loadByStore()
-                    ->toOptionArray();
-            } else {
-                $options = Mage::getModel('directory/country')
-                    ->getResourceCollection()
-                    ->loadByStore()
-                    ->toOptionArray();
+                    ->toOptionArray(false);
             }
             if (Mage::app()->useCache('config')) {
                 Mage::app()->saveCache(serialize($options), $cacheKey, array('config'));
             }
         }
-        Varien_Profiler::stop('TEST: '.__METHOD__);
+        Varien_Profiler::stop('TEST: ' . __METHOD__);
+
+        if (count($options)) {
+            $options[] = array(
+                'value' => 'NEW_COUNTRIES',
+                'label' => 'New Territories As Added'
+            );
+        }
+
         return $options;
     }
 
@@ -273,9 +323,7 @@ class Mage_XmlConnect_Helper_Data extends Mage_Core_Helper_Abstract
     {
         $devices = self::getSupportedDevices();
         $options = array();
-        if (count($devices) > 1) {
-            $options[] = array('value' => '', 'label' => Mage::helper('xmlconnect')->__('Please Select Device Type'));
-        }
+        $options[] = array('value' => '', 'label' => Mage::helper('xmlconnect')->__('Please Select Device Type'));
         foreach ($devices as $type => $label) {
             $options[] = array('value' => $type, 'label' => $label);
         }
@@ -294,7 +342,19 @@ class Mage_XmlConnect_Helper_Data extends Mage_Core_Helper_Abstract
     }
 
     /**
-     * Return array for tabs like  label -> action array
+     * Get default Cache Lifetime
+     *
+     * @return int
+     */
+    public function getDefaultCacheLifetime()
+    {
+        return (int)Mage::getStoreConfig(
+            Mage_XmlConnect_Model_Application::XML_PATH_DEFAULT_CACHE_LIFETIME
+        );
+    }
+
+    /**
+     * Return array for tabs like label -> action array
      *
      * @return array
      */
@@ -323,7 +383,7 @@ class Mage_XmlConnect_Helper_Data extends Mage_Core_Helper_Abstract
     }
 
     /**
-     * Merges $changes array to $target array recursive, overwriting existing key,  and adding new one
+     * Merges $changes array to $target array recursive, overwriting existing key, and adding new one
      *
      * @param mixed $target
      * @param mixed $changes
@@ -364,9 +424,10 @@ class Mage_XmlConnect_Helper_Data extends Mage_Core_Helper_Abstract
      */
     public function htmlize($body)
     {
+        $w3cUrl = 'http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd';
         return <<<EOT
 &lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
-&lt;!DOCTYPE html PUBLIC &quot;-//W3C//DTD XHTML 1.0 Strict//EN&quot; &quot;http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd&quot;&gt;
+&lt;!DOCTYPE html PUBLIC &quot;-//W3C//DTD XHTML 1.0 Strict//EN&quot; &quot;$w3cUrl&quot;&gt;
 &lt;html xmlns=&quot;http://www.w3.org/1999/xhtml&quot; xml:lang=&quot;en&quot; lang=&quot;en&quot;&gt;
 &lt;head&gt;
 &lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;style.css&quot; media=&quot;screen&quot;/&gt;
@@ -395,7 +456,7 @@ EOT;
                 <value>' . ($k ? $k : '') . '</value>
             </item>';
         }
-        $result = implode('', $items);
+        $result = implode(PHP_EOL, $items);
         return $result;
     }
 
@@ -408,6 +469,7 @@ EOT;
      */
     public function getSoloXml($ssCcMonths, $ssCcYears)
     {
+        $validatorMessage = $this->__('Please enter issue number or start date for switch/solo card type.');
         // issue number ==== validate-cc-ukss cvv
         $solo = <<<EOT
 <fieldset_optional>
@@ -421,7 +483,7 @@ EOT;
 
     <field name="payment[cc_ss_issue]" type="text" label="{$this->__('Issue Number')}">
         <validators>
-            <validator relation="payment[cc_type]" type="credit_card_ukss" message="{$this->__('Please enter issue number or start date for switch/solo card type.')}"/>
+            <validator relation="payment[cc_type]" type="credit_card_ukss" message="{$validatorMessage}"/>
         </validators>
     </field>;
     <field name="payment[cc_ss_start_month]" type="select" label="{$this->__('Start Date - Month')}">
@@ -510,7 +572,7 @@ EOT;
         $options = array();
         foreach (Mage::getModel('xmlconnect/application')->getCollection() as $app) {
             if (self::isTemplateAllowedForApplication($app)) {
-                $options[] = array('value' => $app->getCode(), 'label' => $app->getName());
+                $options[] = array('value' => $app->getId(), 'label' => $app->getName());
             }
         }
         if (count($options) > 1) {
@@ -522,7 +584,6 @@ EOT;
     /**
      * Get applications array like `code` as `name`
      *
-     * @param
      * @staticvar array $apps
      * @return array
      */
@@ -546,14 +607,15 @@ EOT;
      */
     public static function isTemplateAllowedForApplication($application = null)
     {
-        return $application instanceof Mage_XmlConnect_Model_Application ?
-            in_array($application->getType(), array(self::DEVICE_TYPE_IPHONE)) :
-            false;
+        return $application instanceof Mage_XmlConnect_Model_Application
+            ? in_array($application->getType(), array(self::DEVICE_TYPE_IPHONE))
+            : false;
     }
 
     /**
      * Send broadcast message
      *
+     * @throws Mage_Core_Exception
      * @param Mage_XmlConnect_Model_Queue $queue
      */
     public function sendBroadcastMessage(Mage_XmlConnect_Model_Queue $queue)
@@ -567,7 +629,9 @@ EOT;
             $app = Mage::getModel('xmlconnect/application')->load($appCode, 'code');
 
             if (!$app->getId()) {
-                Mage::throwException(Mage::helper('xmlconnect')->__('Can\'t load application with code "%s"', $appCode));
+                Mage::throwException(
+                    Mage::helper('xmlconnect')->__('Can\'t load application with code "%s"', $appCode)
+                );
             }
 
             $userpwd = $app->getUserpwd();
@@ -575,13 +639,15 @@ EOT;
             $sendType = $queue->getData('type');
             switch ($sendType) {
                 case Mage_XmlConnect_Model_Queue::MESSAGE_TYPE_AIRMAIL:
-                    $broadcastUrl = Mage::getStoreConfig('xmlconnect/' . Mage_XmlConnect_Model_Queue::MESSAGE_TYPE_AIRMAIL . '/broadcast_url');
+                    $configPath = 'xmlconnect/' . Mage_XmlConnect_Model_Queue::MESSAGE_TYPE_AIRMAIL . '/broadcast_url';
+                    $broadcastUrl = Mage::getStoreConfig($configPath);
                     $params = $queue->getAirmailBroadcastParams();
                     break;
 
                 case Mage_XmlConnect_Model_Queue::MESSAGE_TYPE_PUSH:
                 default:
-                    $broadcastUrl = Mage::getStoreConfig('xmlconnect/' . Mage_XmlConnect_Model_Queue::MESSAGE_TYPE_PUSH . '/broadcast_url');
+                    $configPath = 'xmlconnect/' . Mage_XmlConnect_Model_Queue::MESSAGE_TYPE_PUSH . '/broadcast_url';
+                    $broadcastUrl = Mage::getStoreConfig($configPath);
                     $params = $queue->getPushBroadcastParams();
                     break;
             }
@@ -766,7 +832,8 @@ EOT;
         if ( ($native === false)
             || (!isset($native['body']) || !is_array($native['body'])
             || !isset($native['body'][$field])
-            || !Zend_Validate::is($native['body'][$field], 'NotEmpty'))) {
+            || !Zend_Validate::is($native['body'][$field], 'NotEmpty'))
+        ) {
             return false;
         }
         return true;

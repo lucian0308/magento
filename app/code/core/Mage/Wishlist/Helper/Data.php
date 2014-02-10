@@ -20,7 +20,7 @@
  *
  * @category    Mage
  * @package     Mage_Wishlist
- * @copyright   Copyright (c) 2010 Magento Inc. (http://www.magentocommerce.com)
+ * @copyright   Copyright (c) 2011 Magento Inc. (http://www.magentocommerce.com)
  * @license     http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
  */
 
@@ -226,9 +226,9 @@ class Mage_Wishlist_Helper_Data extends Mage_Core_Helper_Abstract
      */
     public function getRemoveUrl($item)
     {
-        return $this->_getUrl('wishlist/index/remove', array(
-            'item' => $item->getWishlistItemId()
-        ));
+        return $this->_getUrl('wishlist/index/remove',
+            array('item' => $item->getWishlistItemId())
+        );
     }
 
     /**
@@ -312,6 +312,31 @@ class Mage_Wishlist_Helper_Data extends Mage_Core_Helper_Abstract
      */
     public function getAddToCartUrl($item)
     {
+        $urlParamName = Mage_Core_Controller_Front_Action::PARAM_NAME_URL_ENCODED;
+        $continueUrl  = Mage::helper('core')->urlEncode(
+            Mage::getUrl('*/*/*', array(
+                '_current'      => true,
+                '_use_rewrite'  => true,
+                '_store_to_url' => true,
+            ))
+        );
+
+        $urlParamName = Mage_Core_Controller_Front_Action::PARAM_NAME_URL_ENCODED;
+        $params = array(
+            'item' => is_string($item) ? $item : $item->getWishlistItemId(),
+            $urlParamName => $continueUrl
+        );
+        return $this->_getUrlStore($item)->getUrl('wishlist/index/cart', $params);
+    }
+
+    /**
+     * Retrieve URL for adding item to shoping cart from shared wishlist
+     *
+     * @param string|Mage_Catalog_Model_Product|Mage_Wishlist_Model_Item $item
+     * @return  string
+     */
+    public function getSharedAddToCartUrl($item)
+    {
         $continueUrl  = Mage::helper('core')->urlEncode(Mage::getUrl('*/*/*', array(
             '_current'      => true,
             '_use_rewrite'  => true,
@@ -323,7 +348,7 @@ class Mage_Wishlist_Helper_Data extends Mage_Core_Helper_Abstract
             'item' => is_string($item) ? $item : $item->getWishlistItemId(),
             $urlParamName => $continueUrl
         );
-        return $this->_getUrlStore($item)->getUrl('wishlist/index/cart', $params);
+        return $this->_getUrlStore($item)->getUrl('wishlist/shared/cart', $params);
     }
 
     /**
@@ -390,7 +415,13 @@ class Mage_Wishlist_Helper_Data extends Mage_Core_Helper_Abstract
     {
         $customer = $this->_getCurrentCustomer();
         $key = $customer->getId().','.$customer->getEmail();
-        return $this->_getUrl('rss/index/wishlist', array('data' => Mage::helper('core')->urlEncode($key), '_secure' => false));
+        return $this->_getUrl(
+            'rss/index/wishlist',
+            array(
+                'data' => Mage::helper('core')->urlEncode($key),
+                '_secure' => false
+            )
+        );
     }
 
     /**
@@ -437,7 +468,9 @@ class Mage_Wishlist_Helper_Data extends Mage_Core_Helper_Abstract
                 $count = count($this->getWishlistItemCollection()->setInStockFilter(true));
             }
             $session->setWishlistDisplayType(Mage::getStoreConfig(self::XML_PATH_WISHLIST_LINK_USE_QTY));
-            $session->setDisplayOutOfStockProducts(Mage::getStoreConfig(self::XML_PATH_CATALOGINVENTORY_SHOW_OUT_OF_STOCK));
+            $session->setDisplayOutOfStockProducts(
+                Mage::getStoreConfig(self::XML_PATH_CATALOGINVENTORY_SHOW_OUT_OF_STOCK)
+            );
         }
         $session->setWishlistItemCount($count);
         Mage::dispatchEvent('wishlist_items_renewed');
