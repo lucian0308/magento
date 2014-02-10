@@ -1,0 +1,27 @@
+{
+    "name": "kylecannon/magento",
+    "description": "Magento 1.x Git Repository",
+    "license": ["OSL-3.0", "AFL-3.0"],
+    "minimum-stability": "dev",
+    "replace": {
+        "zendframework/zendframework1": "*"
+    },
+    "autoload": {
+        "psr-0": {
+            "": [
+                "app/code/local",
+                "app/code/community",
+                "app/code/core",
+                "app/",
+                "lib"
+            ]
+        }
+    },
+    "include-path": [
+        "app/code/local/",
+        "app/code/community/",
+        "app/code/core/",
+        "lib/",
+        "app/"
+    ]
+}
